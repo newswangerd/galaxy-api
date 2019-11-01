@@ -4,7 +4,7 @@ from django_filters import filters
 from django_filters.rest_framework import filterset, DjangoFilterBackend, OrderingFilter
 from rest_framework import viewsets
 from rest_framework.decorators import action as drf_action
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
@@ -41,6 +41,7 @@ class CollectionViewSet(viewsets.GenericViewSet):
             is_highest=True,
             certification='certified',
             exclude_fields='docs_blob',
+            certification='certifed',
             **params
         )
 
@@ -73,18 +74,27 @@ class CollectionViewSet(viewsets.GenericViewSet):
         else:
             params['version'] = version
 
+        # allow partner engineers to see all collections, but limit regular users
+        # to certified ones
+        is_partner_engineer = permissions.IsPartnerEngineer().has_permission(request, self)
+        if not is_partner_engineer:
+            params['certification'] = 'certified'
+
         response = api.list(**params)
 
         if not response.results:
             raise NotFound()
 
-        all_versions = api.list(
-            namespace=namespace,
-            name=name,
-            is_highest=True,
-            certification='certified',
-            fields='version,id,pulp_created,artifact'
-        )
+        all_versions_params = {
+            'namespace': namespace,
+            'name': name,
+            'fields': 'version,id,pulp_created,artifact'
+        }
+
+        if not is_partner_engineer:
+            all_versions_params['certification'] = 'certified'
+
+        all_versions = api.list(**all_versions_params)
 
         all_versions = [
             {
@@ -112,12 +122,9 @@ class CollectionViewSet(viewsets.GenericViewSet):
 
 class CollectionVersionViewSet(viewsets.GenericViewSet):
     lookup_url_kwarg = 'version'
-    lookup_value_regex = r'[0-9A-Za-z.+-]+'
-    serializer_class = serializers.CollectionVersionSerializer
+    lookup_value_regex = r'[0-9a-z_]+/[0-9a-z_]+/[0-9A-Za-z.+-]+'
 
     def list(self, request, *args, **kwargs):
-        namespace, name = self.kwargs['collection'].split('/')
-
         self.paginator.init_from_request(request)
 
         params = self.request.query_params.dict()
@@ -126,21 +133,31 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
             'limit': self.paginator.limit,
         })
 
+        # pulp uses ordering, but the UI is standardized around sort
+        if params.get('sort'):
+            params['ordering'] = params.get('sort')
+            del params['sort']
+
+        if params.get('certification') != 'certified':
+            if not permissions.IsPartnerEngineer().has_permission(request, self):
+                raise PermissionDenied(
+                    detail="User must be a partner engineer to view non-certifed content")
+
         api = galaxy_pulp.PulpCollectionsApi(pulp.get_client())
-        response = api.list(namespace=namespace, name=name, **params)
+        response = api.list(exclude_fields='docs_blob', **params)
 
-        if response.count == 0:
-            raise NotFound()
-
-        data = serializers.CollectionVersionBaseSerializer(response.results, many=True).data
+        data = serializers.CollectionVersionSerializer(response.results, many=True).data
         return self.paginator.paginate_proxy_response(data, response.count)
 
     def retrieve(self, request, *args, **kwargs):
-        namespace, name = self.kwargs['collection'].split('/')
-        version = self.kwargs['version']
+        namespace, name, version = self.kwargs['version'].split('/')
+
+        params = {'namespace': namespace, 'name': name, 'version': version, 'limit': 1}
+        if not permissions.IsPartnerEngineer().has_permission(request, self):
+            params['certification'] = 'certified'
 
         api = galaxy_pulp.PulpCollectionsApi(pulp.get_client())
-        response = api.list(namespace=namespace, name=name, version=version, limit=1)
+        response = api.list(**params)
 
         if not response.results:
             raise NotFound()
