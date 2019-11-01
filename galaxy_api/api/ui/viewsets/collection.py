@@ -41,7 +41,7 @@ class CollectionViewSet(viewsets.GenericViewSet):
             is_highest=True,
             certification='certified',
             exclude_fields='docs_blob',
-            certification='certifed',
+            certification='certified',
             **params
         )
 
@@ -141,7 +141,7 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
         if params.get('certification') != 'certified':
             if not permissions.IsPartnerEngineer().has_permission(request, self):
                 raise PermissionDenied(
-                    detail="User must be a partner engineer to view non-certifed content")
+                    detail="User must be a partner engineer to view non-certified content")
 
         api = galaxy_pulp.PulpCollectionsApi(pulp.get_client())
         response = api.list(exclude_fields='docs_blob', **params)
