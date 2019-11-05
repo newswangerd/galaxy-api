@@ -4,7 +4,7 @@ from django_filters import filters
 from django_filters.rest_framework import filterset, DjangoFilterBackend, OrderingFilter
 from rest_framework import viewsets
 from rest_framework.decorators import action as drf_action
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
@@ -20,15 +20,6 @@ from galaxy_pulp.models import CertificationInfo
 class CollectionViewSet(viewsets.GenericViewSet):
     lookup_url_kwarg = 'collection'
     lookup_value_regex = r'[0-9a-z_]+/[0-9a-z_]+'
-
-    def _set_certified_param(self, request, params):
-        # allow partner engineers to see all collections, but limit regular users
-        # to certified ones
-        if permissions.IsPartnerEngineer().has_permission(request, self):
-            return params
-        else:
-            params['certification'] = constants.CertificationStatus.CERTIFIED.value
-            return params
 
     def list(self, request, *args, **kwargs):
         self.paginator.init_from_request(request)
@@ -47,8 +38,6 @@ class CollectionViewSet(viewsets.GenericViewSet):
 
         api = galaxy_pulp.PulpCollectionsApi(pulp.get_client())
 
-        params = self._set_certified_param(request, params)
-        print (params)
         response = api.list(
             is_highest=True,
             certification='certified',
@@ -82,23 +71,21 @@ class CollectionViewSet(viewsets.GenericViewSet):
 
         if version == '':
             params['is_highest'] = True
+            params['certification'] = constants.CertificationStatus.CERTIFIED.value
         else:
             params['version'] = version
-
-        params = self._set_certified_param(request, params)
 
         response = api.list(**params)
 
         if not response.results:
             raise NotFound()
 
-        all_versions_params = self._set_certified_param(request, {
-            'namespace': namespace,
-            'name': name,
-            'fields': 'version,id,pulp_created,artifact'
-        })
-
-        all_versions = api.list(**all_versions_params)
+        all_versions = api.list(
+            namespace=namespace,
+            name=name,
+            fields='version,id,pulp_created,artifact',
+            certification=constants.CertificationStatus.CERTIFIED.value
+        )
 
         all_versions = [
             {
@@ -128,10 +115,6 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
     lookup_url_kwarg = 'version'
     lookup_value_regex = r'[0-9a-z_]+/[0-9a-z_]+/[0-9A-Za-z.+-]+'
 
-    def _set_certified_param(self, params):
-        params['certification'] = constants.CertificationStatus.CERTIFIED.value
-        return params
-
     def list(self, request, *args, **kwargs):
         self.paginator.init_from_request(request)
 
@@ -146,7 +129,6 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
             params['ordering'] = params.get('sort')
             del params['sort']
 
-        params = self._set_certified_param(params)
         api = galaxy_pulp.PulpCollectionsApi(pulp.get_client())
         response = api.list(exclude_fields='docs_blob', **params)
 
@@ -156,16 +138,8 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
     def retrieve(self, request, *args, **kwargs):
         namespace, name, version = self.kwargs['version'].split('/')
 
-        params = self._set_certified_param({
-            'namespace': namespace,
-            'name': name,
-            'version':
-            version,
-            'limit': 1
-        })
-
         api = galaxy_pulp.PulpCollectionsApi(pulp.get_client())
-        response = api.list(**params)
+        response = api.list(namespace=namespace, name=name, version=version, limit=1)
 
         if not response.results:
             raise NotFound()
@@ -203,15 +177,6 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
             certification_info=CertificationInfo(certification),
         )
         return Response(response)
-
-
-class FullCollectionVersionViewSet(CollectionVersionViewSet):
-    permission_classes = api_settings.DEFAULT_PERMISSION_CLASSES + [
-        permissions.IsPartnerEngineer,
-    ]
-
-    def _set_certified_param(self, params):
-        return params
 
 
 class CollectionImportFilter(filterset.FilterSet):
