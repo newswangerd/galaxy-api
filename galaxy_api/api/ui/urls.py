@@ -10,6 +10,8 @@ router.register('my-namespaces', viewsets.MyNamespaceViewSet, basename='my-names
 router.register('collections', viewsets.CollectionViewSet, basename='collections')
 router.register('collection-versions',
                 viewsets.CollectionVersionViewSet, basename='collection-versions')
+router.register('all-collection-versions',
+                viewsets.FullCollectionVersionViewSet, basename='all-collection-versions')
 router.register(
     'imports/collections',
     viewsets.CollectionImportViewSet,

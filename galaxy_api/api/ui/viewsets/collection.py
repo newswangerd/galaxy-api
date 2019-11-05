@@ -128,6 +128,10 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
     lookup_url_kwarg = 'version'
     lookup_value_regex = r'[0-9a-z_]+/[0-9a-z_]+/[0-9A-Za-z.+-]+'
 
+    def _set_certified_param(self, params):
+        params['certification'] = constants.CertificationStatus.CERTIFIED.value
+        return params
+
     def list(self, request, *args, **kwargs):
         self.paginator.init_from_request(request)
 
@@ -142,11 +146,7 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
             params['ordering'] = params.get('sort')
             del params['sort']
 
-        if params.get('certification') != constants.CertificationStatus.CERTIFIED.value:
-            if not permissions.IsPartnerEngineer().has_permission(request, self):
-                raise PermissionDenied(
-                    detail="User must be a partner engineer to view non-certified content")
-
+        params = self._set_certified_param(params)
         api = galaxy_pulp.PulpCollectionsApi(pulp.get_client())
         response = api.list(exclude_fields='docs_blob', **params)
 
@@ -156,9 +156,13 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
     def retrieve(self, request, *args, **kwargs):
         namespace, name, version = self.kwargs['version'].split('/')
 
-        params = {'namespace': namespace, 'name': name, 'version': version, 'limit': 1}
-        if not permissions.IsPartnerEngineer().has_permission(request, self):
-            params['certification'] = constants.CertificationStatus.CERTIFIED.value
+        params = self._set_certified_param({
+            'namespace': namespace,
+            'name': name,
+            'version':
+            version,
+            'limit': 1
+        })
 
         api = galaxy_pulp.PulpCollectionsApi(pulp.get_client())
         response = api.list(**params)
@@ -199,6 +203,15 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
             certification_info=CertificationInfo(certification),
         )
         return Response(response)
+
+
+class FullCollectionVersionViewSet(CollectionVersionViewSet):
+    permission_classes = api_settings.DEFAULT_PERMISSION_CLASSES + [
+        permissions.IsPartnerEngineer,
+    ]
+
+    def _set_certified_param(self, params):
+        return params
 
 
 class CollectionImportFilter(filterset.FilterSet):
