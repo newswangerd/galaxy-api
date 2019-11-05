@@ -12,6 +12,7 @@ from rest_framework.settings import api_settings
 from galaxy_api.api import models, permissions
 from galaxy_api.api.ui import serializers
 from galaxy_api.common import pulp
+from galaxy_api import constants
 
 from galaxy_pulp.models import CertificationInfo
 
@@ -19,6 +20,15 @@ from galaxy_pulp.models import CertificationInfo
 class CollectionViewSet(viewsets.GenericViewSet):
     lookup_url_kwarg = 'collection'
     lookup_value_regex = r'[0-9a-z_]+/[0-9a-z_]+'
+
+    def _set_certified_param(self, request, params):
+        # allow partner engineers to see all collections, but limit regular users
+        # to certified ones
+        if permissions.IsPartnerEngineer().has_permission(request, self):
+            return params
+        else:
+            params['certification'] = constants.CertificationStatus.CERTIFIED.value
+            return params
 
     def list(self, request, *args, **kwargs):
         self.paginator.init_from_request(request)
@@ -37,11 +47,12 @@ class CollectionViewSet(viewsets.GenericViewSet):
 
         api = galaxy_pulp.PulpCollectionsApi(pulp.get_client())
 
+        params = self._set_certified_param(request, params)
+        print (params)
         response = api.list(
             is_highest=True,
             certification='certified',
             exclude_fields='docs_blob',
-            certification='certified',
             **params
         )
 
@@ -74,25 +85,18 @@ class CollectionViewSet(viewsets.GenericViewSet):
         else:
             params['version'] = version
 
-        # allow partner engineers to see all collections, but limit regular users
-        # to certified ones
-        is_partner_engineer = permissions.IsPartnerEngineer().has_permission(request, self)
-        if not is_partner_engineer:
-            params['certification'] = 'certified'
+        params = self._set_certified_param(request, params)
 
         response = api.list(**params)
 
         if not response.results:
             raise NotFound()
 
-        all_versions_params = {
+        all_versions_params = self._set_certified_param(request, {
             'namespace': namespace,
             'name': name,
             'fields': 'version,id,pulp_created,artifact'
-        }
-
-        if not is_partner_engineer:
-            all_versions_params['certification'] = 'certified'
+        })
 
         all_versions = api.list(**all_versions_params)
 
@@ -138,7 +142,7 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
             params['ordering'] = params.get('sort')
             del params['sort']
 
-        if params.get('certification') != 'certified':
+        if params.get('certification') != constants.CertificationStatus.CERTIFIED.value:
             if not permissions.IsPartnerEngineer().has_permission(request, self):
                 raise PermissionDenied(
                     detail="User must be a partner engineer to view non-certified content")
@@ -154,7 +158,7 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
 
         params = {'namespace': namespace, 'name': name, 'version': version, 'limit': 1}
         if not permissions.IsPartnerEngineer().has_permission(request, self):
-            params['certification'] = 'certified'
+            params['certification'] = constants.CertificationStatus.CERTIFIED.value
 
         api = galaxy_pulp.PulpCollectionsApi(pulp.get_client())
         response = api.list(**params)
