@@ -14,3 +14,4 @@ class TestCollectionVersionViewSet(BaseTestCase):
         patcher = mock.patch("galaxy_pulp.GalaxyCollectionVersionsApi", spec=True)
         self.versions_api = patcher.start().return_value
         self.addCleanup(patcher.stop)
+        
