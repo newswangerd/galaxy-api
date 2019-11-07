@@ -5,9 +5,9 @@ from galaxy_api.api import permissions
 from galaxy_api.api.ui import serializers
 
 
-class MeViewSet(viewsets.GenericViewSet):
+class CurrentUserViewSet(viewsets.GenericViewSet):
     def retrieve(self, request, *args, **kwargs):
-        data = serializers.MeSerializer({
+        data = serializers.CurrentUserSerializer({
             'is_partner_engineer': permissions.IsPartnerEngineer().has_permission(request, self)
         }).data
 

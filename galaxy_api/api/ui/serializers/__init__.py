@@ -15,8 +15,8 @@ from .namespace import (
     NamespaceSummarySerializer
 )
 
-from .me import (
-    MeSerializer
+from .current_user import (
+    CurrentUserSerializer
 )
 
 
@@ -31,5 +31,5 @@ __all__ = (
     'ImportTaskListSerializer',
     'NamespaceSerializer',
     'NamespaceSummarySerializer',
-    'MeSerializer'
+    'CurrentUserSerializer'
 )
