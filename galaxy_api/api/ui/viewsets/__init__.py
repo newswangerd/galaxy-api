@@ -1,6 +1,7 @@
 from .namespace import NamespaceViewSet, MyNamespaceViewSet
 from .collection import CollectionViewSet, CollectionVersionViewSet, CollectionImportViewSet
 from .tags import TagsViewSet
+from .me import MeViewSet
 
 __all__ = (
     'NamespaceViewSet',
@@ -9,4 +10,5 @@ __all__ = (
     'CollectionVersionViewSet',
     'CollectionImportViewSet',
     'TagsViewSet',
+    'MeViewSet'
 )

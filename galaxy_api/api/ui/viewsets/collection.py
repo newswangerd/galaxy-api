@@ -40,7 +40,6 @@ class CollectionViewSet(viewsets.GenericViewSet):
 
         response = api.list(
             is_highest=True,
-            certification='certified',
             exclude_fields='docs_blob',
             **params
         )
@@ -157,8 +156,7 @@ class CollectionVersionViewSet(viewsets.GenericViewSet):
         serializer_class=serializers.CertificationSerializer
     )
     def set_certified(self, request, *args, **kwargs):
-        namespace, name = self.kwargs['collection'].split('/')
-        version = self.kwargs['version']
+        namespace, name, version = self.kwargs['version'].split('/')
         namespace_obj = get_object_or_404(models.Namespace, name=namespace)
         self.check_object_permissions(request, namespace_obj)
 
