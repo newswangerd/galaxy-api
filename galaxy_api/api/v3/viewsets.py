@@ -242,13 +242,20 @@ class CollectionArtifactDownloadView(views.APIView):
             raise NotFound()
 
         if response.status_code == requests.codes.found:
-            return HttpResponseRedirect(response.headers['Location'])
+            return self.set_filename_header(HttpResponseRedirect(response.headers['Location']))
 
         if response.status_code == requests.codes.ok:
-            return StreamingHttpResponse(
+            return self.set_filename_header(StreamingHttpResponse(
                 response.iter_content(chunk_size=4096),
                 content_type=response.headers['Content-Type']
-            )
+            ))
 
         raise APIException('Unexpected response from content app. '
                            f'Code: {response.status_code}.')
+
+    def set_filename_header(self, response):
+        response['Content-Disposition'] = \
+            'attachment; filename={filename}.tar'.format(
+                filename=self.kwargs['filename']
+            )
+        return response
