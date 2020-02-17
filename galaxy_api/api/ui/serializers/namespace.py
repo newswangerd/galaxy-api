@@ -25,7 +25,7 @@ class NamespaceSerializer(ModelSerializer):
         slug_field='name',
         queryset=auth_models.Group.objects.all()
     )
-    avatar_url = URLField(allow_blank=True)
+    avatar_url = URLField(allow_blank=True, required=False)
 
     class Meta:
         model = models.Namespace
