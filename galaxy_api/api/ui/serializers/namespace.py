@@ -3,7 +3,7 @@ import re
 from django.db import transaction
 
 from rest_framework.exceptions import ValidationError
-from rest_framework.serializers import ModelSerializer, SlugRelatedField, URLField
+from rest_framework.serializers import ModelSerializer, SlugRelatedField
 
 from galaxy_api.api import models
 from galaxy_api.auth import models as auth_models
@@ -11,8 +11,6 @@ from galaxy_api.auth import auth
 
 
 class NamespaceLinkSerializer(ModelSerializer):
-    url = URLField()
-
     class Meta:
         model = models.NamespaceLink
         fields = ('name', 'url')
@@ -25,7 +23,6 @@ class NamespaceSerializer(ModelSerializer):
         slug_field='name',
         queryset=auth_models.Group.objects.all()
     )
-    avatar_url = URLField(allow_blank=True, required=False)
 
     class Meta:
         model = models.Namespace
